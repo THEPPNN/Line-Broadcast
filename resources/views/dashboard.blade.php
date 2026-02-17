@@ -71,12 +71,12 @@
                         <table class="table table-bordered">
                             <thead>
                                 <tr>
-                                    <th>ลำดับ</th>
-                                    <th>หัวข้อข่าว</th>
+                                    <th width="5%">ลำดับ</th>
+                                    <th width="15%">หัวข้อข่าว</th>
                                     <th>รายละเอียด</th>
-                                    <th>ตั้งเวลาส่ง</th>
-                                    <th>สถานะ</th>
-                                    <th>กิจกรรม</th>
+                                    <th width="15%">ตั้งเวลาส่ง</th>
+                                    <th width="10%">สถานะ</th>
+                                    <th width="15%">กิจกรรม</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -91,14 +91,14 @@
                                         <img src="{{ asset('storage/'.$announcement->image) }}" class="img-fluid" width="120">
                                         @endif
                                     </td>
-                                    <td>{{ $announcement->send_at }}</td>
+                                    <td>{{ date('d/m/Y H:i', strtotime($announcement->send_at)) }}</td>
                                     <td>{{ $announcement->status }}</td>
                                     <td>
                                         @if($announcement->status == 'pending')
                                         <button class="btn btn-outline-danger cancel-announcement" data-id="{{ $announcement->id }}">ยกเลิก</button>
                                         @endif
 
-                                        @if($announcement->status != 'sent')
+                                        @if($announcement->status != 'sending')
                                         <button class="btn btn-outline-success send-announcement" data-id="{{ $announcement->id }}">ส่งก่อนเวลา</button>
                                         @endif
                                     </td>
