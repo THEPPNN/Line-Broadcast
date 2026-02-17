@@ -19,7 +19,11 @@ class AnnouncementController extends Controller
         $data['send_at'] = $data['send_at'].' '.$data['send_at_time'];
         $response = $service->create($data);
 
-        return $response;
+        return response()->json([
+            'success' => true,
+            'message' => 'Announcement created successfully',
+            'data' => $response
+        ], 200);
     }
     public function cancel($id, AnnouncementService $service)
     {

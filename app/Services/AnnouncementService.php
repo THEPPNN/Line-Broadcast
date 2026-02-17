@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Announcement;
-use App\Jobs\SendAnnouncementJob;
-use Illuminate\Support\Facades\Storage;
+use App\Jobs\SendLineMessageJob;
+use App\Models\Group;
+use App\Models\AnnouncementLog;
+use Illuminate\Support\Facades\DB;
 
 class AnnouncementService
 {
@@ -51,30 +53,52 @@ class AnnouncementService
         $announcement->update([
             'status' => 'cancelled'
         ]);
-        return json_encode([
-            'success' => true,
-            'message' => 'Announcement cancelled successfully',
-        ]);
+        return $announcement;
     }
+
     public function send($id)
     {
-        // sent text  to line than update status to sent
-        $announcement = Announcement::find($id);
-        // $response = Http::post('https://api.line.me/v2/bot/message/push', [
-        //     'to' => 'U4af49806ea6ad87080349c6998712584',
-        //     'messages' => [
-        //         'type' => 'text',
-        //         'text' => $announcement->message
-        //     ]
-        // ]);
+        $announcement = Announcement::findOrFail($id);
 
-        $announcement->update([
-            'status' => 'sent'
-        ]);
+        $groups = Group::where('status', 1)
+            ->whereNotIn('group_id', function ($q) use ($id) {
+                $q->select('group_id')
+                    ->from('announcement_logs')
+                    ->where('announcement_id', $id);
+            })
+            ->pluck('group_id');
 
-        return json_encode([
+        if ($groups->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No groups to send'
+            ], 404);
+        }
+
+        DB::transaction(function () use ($groups, $announcement, $id) {
+            foreach ($groups as $gid) {
+
+                SendLineMessageJob::dispatch(
+                    $gid,
+                    $announcement->id,
+                    $announcement->message,
+                    $announcement->type,
+                    $announcement->image
+                );
+
+                AnnouncementLog::firstOrCreate([
+                    'announcement_id' => $id,
+                    'group_id' => $gid
+                ]);
+            }
+
+            $announcement->update(['status' => 'sending']);
+        });
+
+        return response()->json([
             'success' => true,
-            'message' => 'Announcement sent successfully',
+            'message' => 'Queue sending started'
         ]);
     }
+
 }

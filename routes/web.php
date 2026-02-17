@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AnnouncementController;
 use App\Services\AnnouncementService;
+use Illuminate\Support\Facades\Http;
 
 Route::get('/', function () {
     return view('login');

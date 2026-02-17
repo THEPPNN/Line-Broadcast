@@ -83,7 +83,7 @@
                                 @foreach($announcements as $key => $announcement)
                                 <tr>
                                     <td>{{ $key + 1 }}</td>
-                                    <td>{{ $announcement->type == 1 ? $announcement->title : 'Image' }}</td>
+                                    <td>{{ $announcement->type == 1 ? $announcement->title : '' }}</td>
                                     <td>
                                         @if($announcement->type == 1)
                                         {{ $announcement->message }}
@@ -148,11 +148,13 @@
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    if (response.success) {
-                        alert(response.message);
+                    let data = JSON.parse(response);
+                    console.log(data);
+                    if (data.success) {
+                        alert(data.message);
                         window.location.reload();
                     } else {
-                        alert(response.message);
+                        alert(data.message);
                     }
                 },
                 error: function(xhr) {
@@ -194,8 +196,9 @@
                     _token: '{{ csrf_token() }}',
                 },
                 success: function(response) {
+                    console.log(response);
                     alert(response.message);
-                    window.location.reload();
+                    // window.location.reload();
                 }
             });
         }
