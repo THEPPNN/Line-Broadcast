@@ -59,7 +59,6 @@ class AnnouncementService
     public function send($id)
     {
         $announcement = Announcement::findOrFail($id);
-
         $groups = Group::where('status', 1)
             ->whereNotIn('group_id', function ($q) use ($id) {
                 $q->select('group_id')
@@ -77,7 +76,6 @@ class AnnouncementService
 
         DB::transaction(function () use ($groups, $announcement, $id) {
             foreach ($groups as $gid) {
-
                 SendLineMessageJob::dispatch(
                     $gid,
                     $announcement->id,
@@ -92,7 +90,7 @@ class AnnouncementService
                 ]);
             }
 
-            $announcement->update(['status' => 'sending']);
+            $announcement->update(['status' => 'sending', 'sent_at' => now()]);
         });
 
         return response()->json([
@@ -100,5 +98,4 @@ class AnnouncementService
             'message' => 'Queue sending started'
         ]);
     }
-
 }

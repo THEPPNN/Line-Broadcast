@@ -20,11 +20,14 @@ Route::post('/login', function () {
     return (new AuthController())->login($email, $password);
 });
 
+Route::get('/logout', [AuthController::class, 'logout']);
+
 Route::get('/dashboard', function () {
     return view('dashboard', [
         'announcements' => (new AnnouncementService())->getAll()
     ]);
-})->name('dashboard');
+})->name('dashboard')
+    ->middleware('user.session');
 
 Route::post(
     '/news/announcement',
@@ -33,4 +36,3 @@ Route::post(
 
 Route::post('/news/announcement/cancel/{id}', [AnnouncementController::class, 'cancel']);
 Route::post('/news/announcement/send/{id}', [AnnouncementController::class, 'send']);
- 

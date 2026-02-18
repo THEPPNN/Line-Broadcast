@@ -45,8 +45,8 @@
                             <div class="mb-3">
                                 <label class="form-label">ตั้งเวลาส่ง</label>
                                 <div class="d-flex gap-2">
-                                    <input type="date" name="send_at" class="form-control" required>
-                                    <input type="time" name="send_at_time" class="form-control" required>
+                                    <input type="date" name="send_at" class="form-control"  value="{{ date('Y-m-d') }}" required>
+                                    <input type="time" name="send_at_time" class="form-control" value="{{ date('H:i') }}" required>
                                 </div>
                             </div>
 
@@ -95,11 +95,11 @@
                                     <td>{{ $announcement->status }}</td>
                                     <td>
                                         @if($announcement->status == 'pending')
-                                        <button class="btn btn-outline-danger cancel-announcement" data-id="{{ $announcement->id }}">ยกเลิก</button>
+                                        <button class="btn btn-sm btn-outline-danger cancel-announcement" data-id="{{ $announcement->id }}">ยกเลิก</button>
                                         @endif
 
                                         @if($announcement->status != 'sending')
-                                        <button class="btn btn-outline-success send-announcement" data-id="{{ $announcement->id }}">ส่งก่อนเวลา</button>
+                                        <button class="btn btn-sm btn-outline-success send-announcement" data-id="{{ $announcement->id }}">ส่งก่อนเวลา</button>
                                         @endif
                                     </td>
                                 </tr>
@@ -148,8 +148,7 @@
                 processData: false,
                 contentType: false,
                 success: function(response) {
-                    let data = JSON.parse(response);
-                    console.log(data);
+                    let data = response;
                     if (data.success) {
                         alert(data.message);
                         window.location.reload();
@@ -196,9 +195,8 @@
                     _token: '{{ csrf_token() }}',
                 },
                 success: function(response) {
-                    console.log(response);
                     alert(response.message);
-                    // window.location.reload();
+                    window.location.reload();
                 }
             });
         }

@@ -39,9 +39,7 @@ class SendLineMessageJob implements ShouldQueue
             // build message
             // ----------------
             if ($this->type == 2 && $this->image) {
-
-                $url = url('storage/' . $this->image);
-
+                $url = env('APP_PUBLIC_URL') . '/storage/' . $this->image;
                 $messages = [[
                     'type' => 'image',
                     'originalContentUrl' => $url,
@@ -54,7 +52,7 @@ class SendLineMessageJob implements ShouldQueue
                     'text' => $this->message
                 ]];
             }
-
+            echo '--------------------------------';
             // ----------------
             // send request
             // ----------------

@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/webhook/line',
         ]);
+        $middleware->alias([
+            'user.session' => \App\Http\Middleware\CheckUserSession::class,
+        ]);
     })
     ->withMiddleware(function (Middleware $middleware): void {
         //
