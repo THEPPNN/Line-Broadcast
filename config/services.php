@@ -29,6 +29,7 @@ return [
     ],
     'line' => [
         'token' => env('LINE_CHANNEL_TOKEN'),
+        'secret' => env('LINE_CHANNEL_SECRET'),
     ],
     'slack' => [
         'notifications' => [
