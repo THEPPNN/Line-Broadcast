@@ -5,5 +5,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class Group extends Model
 {
+    protected $table = 'line_groups';
     protected $fillable = ['group_id','name','type','status'];
 }
