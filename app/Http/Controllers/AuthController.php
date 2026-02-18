@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use Illuminate\Support\Facades\Http;
 
 class AuthController
 {
@@ -8,7 +9,10 @@ class AuthController
     {
         $email = request('email');
         $password = request('password');
-        if ($email == 'admin@gmail.com' && $password == '123456') {
+
+        $admin_password = config('services.line.admin_password');
+
+        if ($email == 'admin@gmail.com' && $password == $admin_password) {
             // set session
             session(['user' => [
                 'email' => $email,
