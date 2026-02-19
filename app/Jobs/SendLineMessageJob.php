@@ -40,6 +40,7 @@ class SendLineMessageJob implements ShouldQueue
             // ----------------
             if ($this->type == 2 && $this->image) {
                 $url = config('filesystems.disks.s3.url') . '/' . $this->image;
+                Log::info('IMAGE URL : ' . $url);
                 $messages = [[
                     'type' => 'image',
                     'originalContentUrl' => $url,
@@ -52,7 +53,7 @@ class SendLineMessageJob implements ShouldQueue
                     'text' => $this->message
                 ]];
             }
-            echo '--------------------------------';
+            Log::info('MESSAGES : ' . json_encode($messages));
             // ----------------
             // send request
             // ----------------
