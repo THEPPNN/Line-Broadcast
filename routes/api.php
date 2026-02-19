@@ -147,7 +147,7 @@ Route::post('/webhook/line', function (Request $request) {
                 "ผู้ส่ง: @{$userName}\n" .
                 "เวลา: {$message->created_at}\n" .
                 "ประเภท: " . ($message->type == 'image' ? 'รูปภาพ' : 'ข้อความ') . "\n\n" .
-                ($message->text ? 'ข้อความ: ' . $message->text : '');
+                ($message->text ? 'ข้อความ: '."\n" . $message->text : '');
             $messages = [[
                 'type' => 'text',
                 'text' => $messageText
