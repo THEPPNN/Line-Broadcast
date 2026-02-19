@@ -152,7 +152,7 @@
                     let data = response;
                     if (data.success) {
                         alert(data.message);
-                        // window.location.reload();
+                        window.location.reload();
                     } else {
                         alert(data.message);
                     }

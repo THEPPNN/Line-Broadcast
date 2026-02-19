@@ -39,7 +39,7 @@ class SendLineMessageJob implements ShouldQueue
             // build message
             // ----------------
             if ($this->type == 2 && $this->image) {
-                $url = env('APP_PUBLIC_URL') . '/storage/' . $this->image;
+                $url = config('filesystems.disks.s3.url') . '/' . $this->image;
                 $messages = [[
                     'type' => 'image',
                     'originalContentUrl' => $url,
