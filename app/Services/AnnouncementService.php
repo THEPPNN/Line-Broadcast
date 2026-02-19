@@ -85,7 +85,7 @@ class AnnouncementService
             foreach ($groups as $gid) {
                 $url = null;
                 if ($announcement->image) {
-                    $url = config('filesystems.disks.s3.url') . '/' . $announcement->image;
+                    $url = Storage::disk('s3')->url($announcement->image);
                 }
                 SendLineMessageJob::dispatch(
                     $gid,
