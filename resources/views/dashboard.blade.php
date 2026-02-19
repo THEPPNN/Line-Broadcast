@@ -53,7 +53,7 @@
                             <!-- Buttons -->
                             <div class="d-flex justify-content-between">
                                 <a href="/logout" class="btn btn-secondary">← ออก</a>
-                                <button class="btn btn-success">
+                                <button class="btn btn-success btn-create-announcement">
                                     🚀 สร้างข่าว
                                 </button>
                             </div>
@@ -138,7 +138,8 @@
 
         $('#create-announcement').submit(function(e) {
             e.preventDefault();
-
+            $('.btn-create-announcement').prop('disabled', true);
+            $('.btn-create-announcement').html('กำลังสร้าง...');
             let formData = new FormData(this);
 
             $.ajax({
@@ -155,9 +156,13 @@
                     } else {
                         alert(data.message);
                     }
+                    $('.btn-create-announcement').prop('disabled', false);
+                    $('.btn-create-announcement').html('🚀 สร้างข่าว');
                 },
                 error: function(xhr) {
                     console.log(xhr.responseText);
+                    $('.btn-create-announcement').prop('disabled', false);
+                    $('.btn-create-announcement').html('สร้างข่าว');
                 }
             });
         });
