@@ -7,18 +7,25 @@ use App\Jobs\SendLineMessageJob;
 use App\Models\Group;
 use App\Models\AnnouncementLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class AnnouncementService
 {
     public function create($data)
     {
         $imagePath = null;
+        
+        if (!empty($data['image'])) {
 
-        if (isset($data['image'])) {
-            $imagePath = $data['image']
-                ->store('announcements', 'public');
+            $path = Storage::disk('s3')->putFile('announcements', $data['image']);
+        
+            if (!$path) {
+                throw new \Exception('R2 upload failed');
+            }
+        
+            $imagePath = $path;
         }
-
+        
         $announcement = Announcement::create([
             'title' => $data['title'] ?? null,
             'message' => $data['message'] ?? null,

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class AnnouncementController extends Controller
             'send_at' => 'required|date',
             'send_at_time' => 'required|date_format:H:i'
         ]);
-        $data['send_at'] = $data['send_at'].' '.$data['send_at_time'];
+        $data['send_at'] = $data['send_at'] . ' ' . $data['send_at_time'];
         $response = $service->create($data);
 
         return response()->json([
@@ -28,11 +29,19 @@ class AnnouncementController extends Controller
     public function cancel($id, AnnouncementService $service)
     {
         $response = $service->cancel($id);
-        return $response;
+        return response()->json([
+            'success' => true,
+            'message' => 'Announcement cancelled successfully',
+            'data' => $response
+        ], 200);
     }
     public function send($id, AnnouncementService $service)
     {
         $response = $service->send($id);
-        return $response;
+        return response()->json([
+            'success' => true,
+            'message' => 'Announcement sent successfully',
+            'data' => $response
+        ], 200);
     }
 }

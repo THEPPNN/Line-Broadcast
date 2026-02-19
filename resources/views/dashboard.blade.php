@@ -88,7 +88,7 @@
                                         @if($announcement->type == 1)
                                         {{ $announcement->message }}
                                         @else
-                                        <img src="{{ asset('storage/'.$announcement->image) }}" class="img-fluid" width="120">
+                                        <img src="{{ config('filesystems.disks.s3.url') . '/' . $announcement->image }}" class="img-fluid" width="120">
                                         @endif
                                     </td>
                                     <td>{{ date('d/m/Y H:i', strtotime($announcement->send_at)) }}</td>
@@ -152,7 +152,7 @@
                     let data = response;
                     if (data.success) {
                         alert(data.message);
-                        window.location.reload();
+                        // window.location.reload();
                     } else {
                         alert(data.message);
                     }
@@ -162,7 +162,7 @@
                 error: function(xhr) {
                     console.log(xhr.responseText);
                     $('.btn-create-announcement').prop('disabled', false);
-                    $('.btn-create-announcement').html('สร้างข่าว');
+                    $('.btn-create-announcement').html('🚀 สร้างข่าว');
                 }
             });
         });

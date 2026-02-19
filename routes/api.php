@@ -54,20 +54,33 @@ Route::post('/webhook/line', function (Request $request) {
 
                 $res = Http::withToken(config('services.line.token'))
                     ->get("https://api-data.line.me/v2/bot/message/$messageId/content");
-
-                if ($res->successful()) {
-
-                    $ext = match ($type) {
-                        'image' => 'jpg',
-                        'video' => 'mp4',
-                        'audio' => 'm4a',
-                        default => 'bin'
-                    };
-
-                    $filePath = "line_media/$messageId.$ext";
-
-                    Storage::disk('public')->put($filePath, $res->body());
+            
+                if (!$res->successful()) {
+                    Log::error('LINE download failed', ['status'=>$res->status()]);
+                    return;
                 }
+            
+                $ext = match ($type) {
+                    'image' => 'jpg',
+                    'video' => 'mp4',
+                    'audio' => 'm4a',
+                    default => 'bin'
+                };
+            
+                $filePath = "line_media/{$messageId}.{$ext}";
+            
+                $uploaded = Storage::disk('s3')->put(
+                    $filePath,
+                    $res->body(),
+                    ['visibility'=>'public']
+                );
+            
+                if (!$uploaded) {
+                    Log::error('R2 upload failed');
+                    return;
+                }
+            
+                Log::info('UPLOAD SUCCESS', ['path'=>$filePath]);
             }
 
             // ---------- save message ----------
@@ -147,7 +160,7 @@ Route::post('/webhook/line', function (Request $request) {
                 ]);
 
             if ($message->type == "image") { // ถ้าเป็นรูปภาพ ส่งรูปภาพไปยังกลุ่ม
-                $url = env('APP_PUBLIC_URL') . '/storage/' . $message->file_url;
+                $url = config('filesystems.disks.s3.url') . '/' . $message->file_url;
                 $messages = [[
                     'type' => 'image',
                     'originalContentUrl' => $url,
@@ -155,10 +168,10 @@ Route::post('/webhook/line', function (Request $request) {
                 ]];
 
                 $response = Http::withToken(config('services.line.token'))
-                ->post('https://api.line.me/v2/bot/message/push', [
-                    'to' => $message->group_id,
-                    'messages' => $messages
-                ]);
+                    ->post('https://api.line.me/v2/bot/message/push', [
+                        'to' => $message->group_id,
+                        'messages' => $messages
+                    ]);
             }
             // --------------------end sent message to group ------------
         }
