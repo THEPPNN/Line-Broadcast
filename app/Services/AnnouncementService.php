@@ -14,18 +14,18 @@ class AnnouncementService
     public function create($data)
     {
         $imagePath = null;
-        
+
         if (!empty($data['image'])) {
 
             $path = Storage::disk('s3')->putFile('announcements', $data['image']);
-        
+
             if (!$path) {
                 throw new \Exception('R2 upload failed');
             }
-        
+
             $imagePath = $path;
         }
-        
+
         $announcement = Announcement::create([
             'title' => $data['title'] ?? null,
             'message' => $data['message'] ?? null,
@@ -83,12 +83,16 @@ class AnnouncementService
 
         DB::transaction(function () use ($groups, $announcement, $id) {
             foreach ($groups as $gid) {
+                $url = null;
+                if ($announcement->image) {
+                    $url = config('filesystems.disks.s3.url') . '/' . $announcement->image;
+                }
                 SendLineMessageJob::dispatch(
                     $gid,
                     $announcement->id,
                     $announcement->message,
                     $announcement->type,
-                    $announcement->image
+                    $url
                 );
 
                 AnnouncementLog::firstOrCreate([

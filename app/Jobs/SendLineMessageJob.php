@@ -39,7 +39,7 @@ class SendLineMessageJob implements ShouldQueue
             // build message
             // ----------------
             if ($this->type == 2 && $this->image) {
-                $url = config('filesystems.disks.s3.url') . '/' . $this->image;
+                $url = $this->image;
                 Log::info('IMAGE URL : ' . $url);
                 $messages = [[
                     'type' => 'image',
