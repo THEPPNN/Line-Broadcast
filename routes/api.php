@@ -3,14 +3,20 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\LineEvent;
-use App\Jobs\ProcessLineMessage;
 use App\Jobs\ProcessLineUnsend;
 use App\Jobs\ProcessLineGroup;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use App\Jobs\UploadLineMediaToS3;
+use Illuminate\Support\Facades\Log;
+use App\Models\LineMessage;
 
 Route::post('/webhook/line', function (Request $request) {
+
     $body = $request->all();
 
     foreach ($body['events'] ?? [] as $event) {
+
         LineEvent::create([
             'event_id' => $event['webhookEventId'] ?? null,
             'type' => $event['type'] ?? null,
@@ -23,22 +29,121 @@ Route::post('/webhook/line', function (Request $request) {
         ]);
 
         if (($event['type'] ?? null) === 'message') {
-            ProcessLineMessage::dispatch($event)->onQueue('line');
-        
+
+            $msg = $event['message'];
+            $messageId = $msg['id'];
+            $type = $msg['type'];
+
+            $localPath = null;
+
+            /*
+            |--------------------------------------------------------------------------
+            | DOWNLOAD MEDIA IMMEDIATELY
+            |--------------------------------------------------------------------------
+            */
+
+            if (in_array($type, ['image', 'video', 'audio', 'file'])) {
+
+                try {
+
+                    $response = Http::withToken(config('services.line.token'))
+                        ->timeout(20)
+                        ->get("https://api-data.line.me/v2/bot/message/{$messageId}/content");
+
+                    if ($response->successful()) {
+
+                        $ext = match ($type) {
+                            'image' => 'jpg',
+                            'video' => 'mp4',
+                            'audio' => 'm4a',
+                            default => 'bin'
+                        };
+
+                        $localPath = "line_temp/{$messageId}.{$ext}";
+
+                        Storage::disk('local')->put(
+                            $localPath,
+                            $response->body()
+                        );
+
+                        // dispatch upload job
+                        UploadLineMediaToS3::dispatch($localPath, $messageId, $type)
+                            ->onQueue('line');
+                    }
+                } catch (\Throwable $e) {
+                    Log::error('MEDIA DOWNLOAD FAILED', [
+                        'messageId' => $messageId,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | SAVE DATABASE IMMEDIATELY
+            |--------------------------------------------------------------------------
+            */
+
+            LineMessage::create([
+                'message_id' => $messageId,
+                'type'       => $type,
+                'user_id'    => $event['source']['userId'] ?? null,
+                'group_id'   => $event['source']['groupId'] ?? null,
+                'room_id'    => $event['source']['roomId'] ?? null,
+                'text'       => $msg['text'] ?? null,
+                'file_url'   => null, // จะ update ทีหลัง
+                'file_type'  => $type,
+                'unsent_at'  => null,
+                'user_name'  => null,
+            ]);
+
             if (($event['source']['type'] ?? null) === 'group') {
                 ProcessLineGroup::dispatch($event)->onQueue('line');
             }
         }
-        
+
         if (($event['type'] ?? null) === 'unsend') {
             ProcessLineUnsend::dispatch($event)
                 ->delay(now()->addSeconds(5))
                 ->onQueue('line');
         }
-        
     }
-    return response('OK', 200); // response ทันที
+
+    return response('OK', 200);
 });
+
+// Route::post('/webhook/line', function (Request $request) {
+//     $body = $request->all();
+
+//     foreach ($body['events'] ?? [] as $event) {
+//         LineEvent::create([
+//             'event_id' => $event['webhookEventId'] ?? null,
+//             'type' => $event['type'] ?? null,
+//             'source_type' => $event['source']['type'] ?? null,
+//             'user_id' => $event['source']['userId'] ?? null,
+//             'group_id' => $event['source']['groupId'] ?? null,
+//             'room_id' => $event['source']['roomId'] ?? null,
+//             'timestamp' => $event['timestamp'] ?? null,
+//             'raw' => json_encode($event)
+//         ]);
+
+//         if (($event['type'] ?? null) === 'message') {
+//             ProcessLineMessage::dispatch($event)->onQueue('line');
+        
+//             if (($event['source']['type'] ?? null) === 'group') {
+//                 ProcessLineGroup::dispatch($event)->onQueue('line');
+//             }
+//         }
+        
+//         if (($event['type'] ?? null) === 'unsend') {
+//             ProcessLineUnsend::dispatch($event)
+//                 ->delay(now()->addSeconds(5))
+//                 ->onQueue('line');
+//         }
+        
+//     }
+//     return response('OK', 200); // response ทันที
+// });
 
 // Route::post('/webhook/line', function (Request $request) {
 
