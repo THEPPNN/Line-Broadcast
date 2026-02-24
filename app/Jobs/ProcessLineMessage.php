@@ -20,7 +20,7 @@ class ProcessLineMessage implements ShouldQueue
 
     public function handle()
     {
-        
+
         $msg = $this->event['message'] ?? null;
         if (!$msg) return;
 
@@ -31,7 +31,7 @@ class ProcessLineMessage implements ShouldQueue
         if (LineMessage::where('message_id', $messageId)->exists()) {
             return;
         }
-        
+
         Log::info('MESSAGE TYPE DEBUG', [
             'type' => $msg['type'] ?? null,
             'event' => $this->event
@@ -59,24 +59,27 @@ class ProcessLineMessage implements ShouldQueue
 
             try {
                 $response = Http::withToken(config('services.line.token'))
-                    ->timeout(20)
+                    ->timeout(30)
+                    ->withOptions([
+                        'verify' => false,
+                    ])
                     ->get("https://api-data.line.me/v2/bot/message/{$messageId}/content");
 
                 if (!$response->successful()) {
                     Log::error('LINE media fetch failed', [
                         'status' => $response->status(),
+                        'body'   => $response->body(),   // ← เพิ่ม
                         'messageId' => $messageId
                     ]);
-                    return;
+                    throw new \Exception("LINE fetch failed: " . $response->status()); // ← เปลี่ยนจาก return
                 }
 
+                
                 $content = $response->body();
-
+                
                 if (empty($content)) {
-                    Log::error('LINE media empty body', [
-                        'messageId' => $messageId
-                    ]);
-                    return;
+                    Log::error('LINE media empty body', ['messageId' => $messageId]);
+                    throw new \Exception("Empty body for messageId: " . $messageId); // ← เปลี่ยนจาก return
                 }
 
                 $result = Storage::disk('s3')->put(
