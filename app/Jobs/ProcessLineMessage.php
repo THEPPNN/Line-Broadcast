@@ -36,8 +36,12 @@ class ProcessLineMessage implements ShouldQueue
         // =========================
         // MEDIA DOWNLOAD (STREAM)
         // =========================
-        if (in_array($type, ['image', 'video', 'audio', 'file'])) {
 
+        if (in_array($type, ['image', 'video', 'audio', 'file'])) {
+            Log::info('MEDIA TYPE DETECTED', [
+                'type' => $type,
+                'messageId' => $messageId
+            ]);
             $ext = match ($type) {
                 'image' => 'jpg',
                 'video' => 'mp4',
@@ -69,11 +73,16 @@ class ProcessLineMessage implements ShouldQueue
                     return;
                 }
 
-                Storage::disk('s3')->put(
+                $result = Storage::disk('s3')->put(
                     $filePath,
                     $content,
                     ['visibility' => 'public']
                 );
+
+                Log::info('S3 UPLOAD RESULT', [
+                    'result' => $result,
+                    'path' => $filePath
+                ]);
             } catch (\Throwable $e) {
                 Log::error('Media upload error: ' . $e->getMessage());
                 throw $e; // ให้ retry
