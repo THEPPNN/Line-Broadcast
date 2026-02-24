@@ -13,41 +13,41 @@ class ProcessLineMessage implements ShouldQueue
 {
     use Queueable;
 
-    public $tries = 5;          // retry 5 ครั้ง
-    public $backoff = 10;       // เว้น 10 วิ ถ้าล้ม
+    public $tries = 5;
+    public $backoff = 10;
 
     public function __construct(public array $event) {}
 
     public function handle()
     {
-
         $msg = $this->event['message'] ?? null;
         if (!$msg) return;
 
-        $messageId = $msg['id'];
-        $type = $msg['type'];
+        $messageId = $msg['id'] ?? null;
+        $type = $msg['type'] ?? null;
 
-        // ✅ กัน duplicate จาก LINE retry
+        if (!$messageId || !$type) return;
+
+        // กัน duplicate
         if (LineMessage::where('message_id', $messageId)->exists()) {
             return;
         }
 
-        Log::info('MESSAGE TYPE DEBUG', [
-            'type' => $msg['type'] ?? null,
-            'event' => $this->event
+        Log::info('PROCESS LINE MESSAGE', [
+            'messageId' => $messageId,
+            'type' => $type,
         ]);
 
         $filePath = null;
 
-        // =========================
-        // MEDIA DOWNLOAD (STREAM)
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | MEDIA DOWNLOAD
+        |--------------------------------------------------------------------------
+        */
 
         if (in_array($type, ['image', 'video', 'audio', 'file'])) {
-            Log::info('MEDIA TYPE DETECTED', [
-                'type' => $type,
-                'messageId' => $messageId
-            ]);
+
             $ext = match ($type) {
                 'image' => 'jpg',
                 'video' => 'mp4',
@@ -58,49 +58,55 @@ class ProcessLineMessage implements ShouldQueue
             $filePath = "line_media/{$messageId}.{$ext}";
 
             try {
-                $response = Http::withToken(config('services.line.token'))
+
+                $token = config('services.line.token');
+
+                if (!$token) {
+                    throw new \Exception('LINE token is missing');
+                }
+
+                $response = Http::withToken($token)
                     ->timeout(30)
-                    ->withOptions([
-                        'verify' => false,
-                    ])
                     ->get("https://api-data.line.me/v2/bot/message/{$messageId}/content");
 
                 if (!$response->successful()) {
-                    Log::error('LINE media fetch failed', [
-                        'status' => $response->status(),
-                        'body'   => $response->body(),   // ← เพิ่ม
-                        'messageId' => $messageId
-                    ]);
-                    throw new \Exception("LINE fetch failed: " . $response->status()); // ← เปลี่ยนจาก return
+                    throw new \Exception("LINE fetch failed: " . $response->status());
                 }
 
-                
                 $content = $response->body();
-                
+
                 if (empty($content)) {
-                    Log::error('LINE media empty body', ['messageId' => $messageId]);
-                    throw new \Exception("Empty body for messageId: " . $messageId); // ← เปลี่ยนจาก return
+                    throw new \Exception("LINE returned empty body");
                 }
 
-                $result = Storage::disk('s3')->put(
+                Storage::disk('s3')->put(
                     $filePath,
                     $content,
                     ['visibility' => 'public']
                 );
 
-                Log::info('S3 UPLOAD RESULT', [
-                    'result' => $result,
+                Log::info('S3 upload success', [
                     'path' => $filePath
                 ]);
+
             } catch (\Throwable $e) {
-                Log::error('Media upload error: ' . $e->getMessage());
-                throw $e; // ให้ retry
+
+                Log::error('MEDIA PROCESS FAILED', [
+                    'messageId' => $messageId,
+                    'error' => $e->getMessage(),
+                ]);
+
+                // ❗ สำคัญ: ไม่ throw
+                $filePath = null;
             }
         }
 
-        // =========================
-        // USER PROFILE (optional)
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | USER PROFILE (optional)
+        |--------------------------------------------------------------------------
+        */
+
         $userId = $this->event['source']['userId'] ?? null;
         $groupId = $this->event['source']['groupId'] ?? null;
         $displayName = null;
@@ -114,14 +120,18 @@ class ProcessLineMessage implements ShouldQueue
                 if ($profile->successful()) {
                     $displayName = $profile->json()['displayName'] ?? null;
                 }
+
             } catch (\Throwable $e) {
                 Log::warning('Profile fetch failed: ' . $e->getMessage());
             }
         }
 
-        // =========================
-        // SAVE DATABASE
-        // =========================
+        /*
+        |--------------------------------------------------------------------------
+        | SAVE DATABASE (Always Save)
+        |--------------------------------------------------------------------------
+        */
+
         LineMessage::create([
             'message_id' => $messageId,
             'type'       => $type,
@@ -134,10 +144,16 @@ class ProcessLineMessage implements ShouldQueue
             'unsent_at'  => null,
             'user_name'  => $displayName,
         ]);
+
+        Log::info('DB saved', [
+            'messageId' => $messageId
+        ]);
     }
 
     public function failed(\Throwable $exception)
     {
-        Log::error('ProcessLineMessage failed: ' . $exception->getMessage());
+        Log::error('ProcessLineMessage job failed totally', [
+            'error' => $exception->getMessage()
+        ]);
     }
 }
