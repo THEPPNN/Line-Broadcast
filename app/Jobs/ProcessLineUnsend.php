@@ -73,6 +73,9 @@ class ProcessLineUnsend implements ShouldQueue
                 'image' => 'รูปภาพ',
                 'video' => 'วิดีโอ',
                 'audio' => 'เสียง',
+                'file' => 'ไฟล์',
+                'text' => 'ข้อความ',
+                'sticker' => 'สติกเกอร์',
                 default => 'ข้อความ'
             } . "\n\n" .
             ($message->text ? "ข้อความ:\n{$message->text}" : '');
