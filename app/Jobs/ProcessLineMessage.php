@@ -21,16 +21,16 @@ class ProcessLineMessage implements ShouldQueue
     public function handle()
     {
         $msg = $this->event['message'] ?? null;
-        if (!$msg) return;
+        if (!$msg) throw new \Exception('MESSAGE IS NULL');
 
         $messageId = $msg['id'] ?? null;
         $type = $msg['type'] ?? null;
 
-        if (!$messageId || !$type) return;
+        if (!$messageId || !$type) throw new \Exception('MESSAGE ID OR TYPE IS NULL');
 
         // กัน duplicate
         if (LineMessage::where('message_id', $messageId)->exists()) {
-            return;
+            throw new \Exception('MESSAGE ID ALREADY EXISTS');
         }
 
         Log::info('PROCESS LINE MESSAGE', [
