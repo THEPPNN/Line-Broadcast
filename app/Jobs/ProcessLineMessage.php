@@ -20,6 +20,7 @@ class ProcessLineMessage implements ShouldQueue
 
     public function handle()
     {
+        
         $msg = $this->event['message'] ?? null;
         if (!$msg) return;
 
@@ -30,6 +31,11 @@ class ProcessLineMessage implements ShouldQueue
         if (LineMessage::where('message_id', $messageId)->exists()) {
             return;
         }
+        
+        Log::info('MESSAGE TYPE DEBUG', [
+            'type' => $msg['type'] ?? null,
+            'event' => $this->event
+        ]);
 
         $filePath = null;
 
