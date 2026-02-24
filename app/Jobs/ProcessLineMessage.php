@@ -49,23 +49,33 @@ class ProcessLineMessage implements ShouldQueue
 
             try {
                 $response = Http::withToken(config('services.line.token'))
-                    ->timeout(30)
-                    ->withOptions(['stream' => true])
+                    ->timeout(20)
                     ->get("https://api-data.line.me/v2/bot/message/{$messageId}/content");
 
                 if (!$response->successful()) {
-                    throw new \Exception("LINE download failed");
+                    Log::error('LINE media fetch failed', [
+                        'status' => $response->status(),
+                        'messageId' => $messageId
+                    ]);
+                    return;
                 }
 
-                // 🚀 stream เข้า S3 ตรง ไม่พัก RAM
+                $content = $response->body();
+
+                if (empty($content)) {
+                    Log::error('LINE media empty body', [
+                        'messageId' => $messageId
+                    ]);
+                    return;
+                }
+
                 Storage::disk('s3')->put(
                     $filePath,
-                    $response->body(),
+                    $content,
                     ['visibility' => 'public']
                 );
-
             } catch (\Throwable $e) {
-                Log::error('Media upload error: '.$e->getMessage());
+                Log::error('Media upload error: ' . $e->getMessage());
                 throw $e; // ให้ retry
             }
         }
@@ -87,7 +97,7 @@ class ProcessLineMessage implements ShouldQueue
                     $displayName = $profile->json()['displayName'] ?? null;
                 }
             } catch (\Throwable $e) {
-                Log::warning('Profile fetch failed: '.$e->getMessage());
+                Log::warning('Profile fetch failed: ' . $e->getMessage());
             }
         }
 
@@ -110,6 +120,6 @@ class ProcessLineMessage implements ShouldQueue
 
     public function failed(\Throwable $exception)
     {
-        Log::error('ProcessLineMessage failed: '.$exception->getMessage());
+        Log::error('ProcessLineMessage failed: ' . $exception->getMessage());
     }
 }
