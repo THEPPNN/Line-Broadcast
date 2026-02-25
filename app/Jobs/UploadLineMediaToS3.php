@@ -14,38 +14,45 @@ class UploadLineMediaToS3 implements ShouldQueue
     use Queueable;
 
     public function __construct(
-        public string $localPath,
         public string $messageId,
         public string $type
     ) {}
 
     public function handle()
     {
-        $token = config('services.line.channel_access_token');
+        $token = config('services.line.token');
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $token,
-        ])->get("https://api-data.line.me/v2/bot/message/{$this->messageId}/content");
+        $response = Http::withToken($token)
+            ->timeout(20)
+            ->get("https://api-data.line.me/v2/bot/message/{$this->messageId}/content");
 
         if (!$response->successful()) {
-            Log::error('LINE download failed', [
-                'status' => $response->status()
+            Log::error('LINE DOWNLOAD FAILED', [
+                'status' => $response->status(),
+                'messageId' => $this->messageId
             ]);
             return;
         }
 
-        $content = $response->body();
+        $ext = match ($this->type) {
+            'image' => 'jpg',
+            'video' => 'mp4',
+            'audio' => 'm4a',
+            default => 'bin'
+        };
 
-        $s3Path = "line_media/{$this->messageId}.jpg";
+        $s3Path = "line_media/{$this->messageId}.{$ext}";
 
         $result = Storage::disk('s3')->put(
             $s3Path,
-            $content,
+            $response->body(),
             ['visibility' => 'public']
         );
 
         if (!$result) {
-            Log::error('S3 upload failed');
+            Log::error('S3 UPLOAD FAILED', [
+                'messageId' => $this->messageId
+            ]);
             return;
         }
 
@@ -54,38 +61,8 @@ class UploadLineMediaToS3 implements ShouldQueue
                 'file_url' => $s3Path
             ]);
 
-        Log::info('Upload to S3 completed', [
+        Log::info('UPLOAD SUCCESS', [
             'messageId' => $this->messageId
         ]);
     }
-    // public function handle()
-    // {
-    //     if (!Storage::disk('local')->exists($this->localPath)) {
-    //         Log::error('Local file missing', ['path'=>$this->localPath]);
-    //         return;
-    //     }
-
-    //     $content = Storage::disk('local')->get($this->localPath);
-
-    //     $s3Path = "line_media/" . basename($this->localPath);
-
-    //     Storage::disk('s3')->put(
-    //         $s3Path,
-    //         $content,
-    //         ['visibility'=>'public']
-    //     );
-
-    //     // update DB
-    //     LineMessage::where('message_id', $this->messageId)
-    //         ->update([
-    //             'file_url' => $s3Path
-    //         ]);
-
-    //     // delete local file
-    //     Storage::disk('local')->delete($this->localPath);
-
-    //     Log::info('Upload to S3 completed', [
-    //         'messageId' => $this->messageId
-    //     ]);
-    // }
 }

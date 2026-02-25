@@ -34,56 +34,6 @@ Route::post('/webhook/line', function (Request $request) {
             $messageId = $msg['id'];
             $type = $msg['type'];
 
-            $localPath = null;
-
-            /*
-            |--------------------------------------------------------------------------
-            | DOWNLOAD MEDIA IMMEDIATELY
-            |--------------------------------------------------------------------------
-            */
-
-            if (in_array($type, ['image', 'video', 'audio', 'file'])) {
-
-                try {
-
-                    $response = Http::withToken(config('services.line.token'))
-                        ->timeout(20)
-                        ->get("https://api-data.line.me/v2/bot/message/{$messageId}/content");
-
-                    if ($response->successful()) {
-
-                        $ext = match ($type) {
-                            'image' => 'jpg',
-                            'video' => 'mp4',
-                            'audio' => 'm4a',
-                            default => 'bin'
-                        };
-
-                        $localPath = "line_temp/{$messageId}.{$ext}";
-
-                        Storage::disk('local')->put(
-                            $localPath,
-                            $response->body()
-                        );
-
-                        // dispatch upload job
-                        UploadLineMediaToS3::dispatch($localPath, $messageId, $type)
-                            ->onQueue('line');
-                    }
-                } catch (\Throwable $e) {
-                    Log::error('MEDIA DOWNLOAD FAILED', [
-                        'messageId' => $messageId,
-                        'error' => $e->getMessage()
-                    ]);
-                }
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | SAVE DATABASE IMMEDIATELY
-            |--------------------------------------------------------------------------
-            */
-
             LineMessage::create([
                 'message_id' => $messageId,
                 'type'       => $type,
@@ -91,11 +41,18 @@ Route::post('/webhook/line', function (Request $request) {
                 'group_id'   => $event['source']['groupId'] ?? null,
                 'room_id'    => $event['source']['roomId'] ?? null,
                 'text'       => $msg['text'] ?? null,
-                'file_url'   => null, // จะ update ทีหลัง
+                'file_url'   => null,
                 'file_type'  => $type,
                 'unsent_at'  => null,
                 'user_name'  => null,
             ]);
+
+            if (in_array($type, ['image', 'video', 'audio', 'file'])) {
+
+                // 🔥 dispatch แค่ messageId
+                UploadLineMediaToS3::dispatch($messageId, $type)
+                    ->onQueue('line');
+            }
 
             if (($event['source']['type'] ?? null) === 'group') {
                 ProcessLineGroup::dispatch($event)->onQueue('line');
