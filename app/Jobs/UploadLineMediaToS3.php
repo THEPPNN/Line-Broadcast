@@ -26,10 +26,16 @@ class UploadLineMediaToS3 implements ShouldQueue
             ->timeout(20)
             ->get("https://api-data.line.me/v2/bot/message/{$this->messageId}/content");
 
+        Log::info('LINE RESPONSE', [
+            'status' => $response->status(),
+            'successful' => $response->successful(),
+            'messageId' => $this->messageId
+        ]);
+
         if (!$response->successful()) {
             Log::error('LINE DOWNLOAD FAILED', [
                 'status' => $response->status(),
-                'messageId' => $this->messageId
+                'body' => $response->body()
             ]);
             return;
         }
