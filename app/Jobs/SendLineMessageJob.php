@@ -104,7 +104,7 @@ class SendLineMessageJob implements ShouldQueue
         $total = AnnouncementLog::where('announcement_id', $this->announcementId)->count();
 
         $done = AnnouncementLog::where('announcement_id', $this->announcementId)
-            ->whereIn('status', ['success', 'failed'])
+            ->whereIn('status', ['sent', 'failed'])
             ->count();
 
         if ($total === $done) {

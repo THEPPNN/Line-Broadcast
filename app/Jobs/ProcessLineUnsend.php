@@ -21,7 +21,7 @@ class ProcessLineUnsend implements ShouldQueue
     public function handle(): void
     {
         $mid = $this->event['unsend']['messageId'] ?? null;
-
+        Log::info('UNSEND MESSAGE ID : ' . $mid);
         if (!$mid) {
             return;
         }
@@ -55,6 +55,8 @@ class ProcessLineUnsend implements ShouldQueue
                 'is_unsent' => true,
                 'unsent_at' => now()
             ]);
+
+            Log::info('UNSEND MESSAGE UPDATED : ' . json_encode($message));
 
         } catch (\Throwable $e) {
             Log::error('Unsend DB Error: '.$e->getMessage());

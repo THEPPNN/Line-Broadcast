@@ -5,62 +5,50 @@ use Illuminate\Support\Facades\Route;
 use App\Models\LineEvent;
 use App\Jobs\ProcessLineUnsend;
 use App\Jobs\ProcessLineGroup;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use App\Jobs\UploadLineMediaToS3;
 use Illuminate\Support\Facades\Log;
 use App\Models\LineMessage;
+use App\Jobs\FetchLineDisplayName;
 
 Route::post('/webhook/line', function (Request $request) {
     $body = $request->all();
-    foreach ($body['events'] ?? [] as $event) {
+    $eventsToProcess = $body['events'] ?? [];
+    foreach ($eventsToProcess as $event) {
         LineEvent::create([
-            'event_id' => $event['webhookEventId'] ?? null,
-            'type' => $event['type'] ?? null,
+            'event_id'    => $event['webhookEventId'] ?? null,
+            'type'        => $event['type'] ?? null,
             'source_type' => $event['source']['type'] ?? null,
-            'user_id' => $event['source']['userId'] ?? null,
-            'group_id' => $event['source']['groupId'] ?? null,
-            'room_id' => $event['source']['roomId'] ?? null,
-            'timestamp' => $event['timestamp'] ?? null,
-            'raw' => json_encode($event)
+            'user_id'     => $event['source']['userId'] ?? null,
+            'group_id'    => $event['source']['groupId'] ?? null,
+            'room_id'     => $event['source']['roomId'] ?? null,
+            'timestamp'   => $event['timestamp'] ?? null,
+            'raw'         => json_encode($event),
         ]);
         if (($event['type'] ?? null) === 'message') {
             $msg = $event['message'];
-            $messageId = $msg['id'];
-            $type = $msg['type'];
-            $displayName = null;
-            $userId = $event['source']['userId'] ?? null;
-            $groupId = $event['source']['groupId'] ?? null;
-            if ($event['source']['userId'] ?? null && $event['source']['groupId'] ?? null) {
-                $res = Http::withToken(config('services.line.token'))
-                    ->get("https://api.line.me/v2/bot/group/$groupId/member/$userId");
-
-                if ($res->successful()) {
-                    $displayName = $res->json()['displayName'] ?? null;
-                }
-            }
             LineMessage::create([
-                'message_id' => $messageId,
-                'type'       => $type,
+                'message_id' => $msg['id'],
+                'type'       => $msg['type'],
                 'user_id'    => $event['source']['userId'] ?? null,
                 'group_id'   => $event['source']['groupId'] ?? null,
                 'room_id'    => $event['source']['roomId'] ?? null,
                 'text'       => $msg['text'] ?? null,
                 'file_url'   => null,
-                'file_type'  => $type,
+                'file_type'  => $msg['type'],
                 'unsent_at'  => null,
-                'user_name'  => $displayName,
+                'user_name'  => null,
             ]);
-
-            if (in_array($type, ['image', 'video', 'audio', 'file'])) {
-                UploadLineMediaToS3::dispatch($messageId, $type)
+            if (in_array($msg['type'], ['image', 'video', 'audio', 'file'])) {
+                UploadLineMediaToS3::dispatch($msg['id'], $msg['type'], $event['source'], $event['source']['groupId'] ?? null)
+                    ->onQueue('line_media');
+            } else {
+                FetchLineDisplayName::dispatch($msg['id'], $event['source'])
                     ->onQueue('line');
             }
             if (($event['source']['type'] ?? null) === 'group') {
                 ProcessLineGroup::dispatch($event)->onQueue('line');
             }
-        }
-        if (($event['type'] ?? null) === 'unsend') {
+        } else if (($event['type'] ?? null) === 'unsend') {
             ProcessLineUnsend::dispatch($event)
                 ->delay(now()->addSeconds(5))
                 ->onQueue('line');
@@ -71,7 +59,6 @@ Route::post('/webhook/line', function (Request $request) {
 
 // Route::post('/webhook/line', function (Request $request) {
 //     $body = $request->all();
-
 //     foreach ($body['events'] ?? [] as $event) {
 //         LineEvent::create([
 //             'event_id' => $event['webhookEventId'] ?? null,
@@ -83,24 +70,50 @@ Route::post('/webhook/line', function (Request $request) {
 //             'timestamp' => $event['timestamp'] ?? null,
 //             'raw' => json_encode($event)
 //         ]);
-
 //         if (($event['type'] ?? null) === 'message') {
-//             ProcessLineMessage::dispatch($event)->onQueue('line');
-        
+//             $msg = $event['message'];
+//             $messageId = $msg['id'];
+//             $type = $msg['type'];
+//             $displayName = null;
+//             $userId = $event['source']['userId'] ?? null;
+//             $groupId = $event['source']['groupId'] ?? null;
+//             if ($event['source']['userId'] ?? null && $event['source']['groupId'] ?? null) {
+//                 $res = Http::withToken(config('services.line.token'))
+//                     ->get("https://api.line.me/v2/bot/group/$groupId/member/$userId");
+
+//                 if ($res->successful()) {
+//                     $displayName = $res->json()['displayName'] ?? null;
+//                 }
+//             }
+//             LineMessage::create([
+//                 'message_id' => $messageId,
+//                 'type'       => $type,
+//                 'user_id'    => $event['source']['userId'] ?? null,
+//                 'group_id'   => $event['source']['groupId'] ?? null,
+//                 'room_id'    => $event['source']['roomId'] ?? null,
+//                 'text'       => $msg['text'] ?? null,
+//                 'file_url'   => null,
+//                 'file_type'  => $type,
+//                 'unsent_at'  => null,
+//                 'user_name'  => $displayName,
+//             ]);
+
+//             if (in_array($type, ['image', 'video', 'audio', 'file'])) {
+//                 UploadLineMediaToS3::dispatch($messageId, $type, $groupId)
+//                     ->onQueue('line');
+//             }
 //             if (($event['source']['type'] ?? null) === 'group') {
 //                 ProcessLineGroup::dispatch($event)->onQueue('line');
 //             }
 //         }
-        
 //         if (($event['type'] ?? null) === 'unsend') {
 //             ProcessLineUnsend::dispatch($event)
 //                 ->delay(now()->addSeconds(5))
 //                 ->onQueue('line');
 //         }
-        
 //     }
-//     return response('OK', 200); // response ทันที
-// });
+//     return response('OK', 200);
+// }); ล่าสุดบน Prod
 
 // Route::post('/webhook/line', function (Request $request) {
 
