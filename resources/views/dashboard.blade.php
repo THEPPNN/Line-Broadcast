@@ -98,7 +98,7 @@
                                         <button class="btn btn-sm btn-outline-danger cancel-announcement" data-id="{{ $announcement->id }}">ยกเลิก</button>
                                         @endif
 
-                                        @if($announcement->status != 'sending')
+                                        @if($announcement->status != 'pending' && $announcement->status != 'sent')
                                         <button class="btn btn-sm btn-outline-success send-announcement" data-id="{{ $announcement->id }}">ส่งก่อนเวลา</button>
                                         @endif
                                     </td>

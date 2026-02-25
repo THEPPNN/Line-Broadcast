@@ -52,7 +52,8 @@ class AnnouncementService
 
     public function getAll()
     {
-        return Announcement::orderBy('send_at', 'desc')->where('status', '!=', 'cancelled')->get();
+        return Announcement::orderBy('send_at', 'desc')->where('status', '!=', 'cancelled')->limit(15)->get();
+
     }
     public function cancel($id)
     {
