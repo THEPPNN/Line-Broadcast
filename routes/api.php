@@ -12,11 +12,8 @@ use Illuminate\Support\Facades\Log;
 use App\Models\LineMessage;
 
 Route::post('/webhook/line', function (Request $request) {
-
     $body = $request->all();
-
     foreach ($body['events'] ?? [] as $event) {
-
         LineEvent::create([
             'event_id' => $event['webhookEventId'] ?? null,
             'type' => $event['type'] ?? null,
@@ -27,13 +24,21 @@ Route::post('/webhook/line', function (Request $request) {
             'timestamp' => $event['timestamp'] ?? null,
             'raw' => json_encode($event)
         ]);
-
         if (($event['type'] ?? null) === 'message') {
-
             $msg = $event['message'];
             $messageId = $msg['id'];
             $type = $msg['type'];
+            $displayName = null;
+            $userId = $event['source']['userId'] ?? null;
+            $groupId = $event['source']['groupId'] ?? null;
+            if ($event['source']['userId'] ?? null && $event['source']['groupId'] ?? null) {
+                $res = Http::withToken(config('services.line.token'))
+                    ->get("https://api.line.me/v2/bot/group/$groupId/member/$userId");
 
+                if ($res->successful()) {
+                    $displayName = $res->json()['displayName'] ?? null;
+                }
+            }
             LineMessage::create([
                 'message_id' => $messageId,
                 'type'       => $type,
@@ -44,28 +49,23 @@ Route::post('/webhook/line', function (Request $request) {
                 'file_url'   => null,
                 'file_type'  => $type,
                 'unsent_at'  => null,
-                'user_name'  => null,
+                'user_name'  => $displayName,
             ]);
 
             if (in_array($type, ['image', 'video', 'audio', 'file'])) {
-
-                // 🔥 dispatch แค่ messageId
                 UploadLineMediaToS3::dispatch($messageId, $type)
                     ->onQueue('line');
             }
-
             if (($event['source']['type'] ?? null) === 'group') {
                 ProcessLineGroup::dispatch($event)->onQueue('line');
             }
         }
-
         if (($event['type'] ?? null) === 'unsend') {
             ProcessLineUnsend::dispatch($event)
                 ->delay(now()->addSeconds(5))
                 ->onQueue('line');
         }
     }
-
     return response('OK', 200);
 });
 

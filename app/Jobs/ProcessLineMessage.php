@@ -88,6 +88,7 @@ class ProcessLineMessage implements ShouldQueue
                 Log::info('S3 upload success', [
                     'path' => $filePath
                 ]);
+
             } catch (\Throwable $e) {
 
                 Log::error('MEDIA PROCESS FAILED', [
@@ -110,28 +111,21 @@ class ProcessLineMessage implements ShouldQueue
         $groupId = $this->event['source']['groupId'] ?? null;
         $displayName = null;
 
-
         if ($userId && $groupId) {
-            $res = Http::withToken(config('services.line.token'))
-                ->get("https://api.line.me/v2/bot/group/$groupId/member/$userId");
+            try {
+                $profile = Http::withToken(config('services.line.token'))
+                    ->timeout(10)
+                    ->get("https://api.line.me/v2/bot/group/{$groupId}/member/{$userId}");
 
-            if ($res->successful()) {
-                $displayName = $res->json()['displayName'] ?? null;
+                if ($profile->successful()) {
+                    $displayName = $profile->json()['displayName'] ?? null;
+                }
+
+            } catch (\Throwable $e) {
+                Log::warning('Profile fetch failed: ' . $e->getMessage());
             }
         }
-        // if ($userId && $groupId) {
-        //     try {
-        //         $profile = Http::withToken(config('services.line.token'))
-        //             ->timeout(10)
-        //             ->get("https://api.line.me/v2/bot/group/{$groupId}/member/{$userId}");
 
-        //         if ($profile->successful()) {
-        //             $displayName = $profile->json()['displayName'] ?? null;
-        //         }
-        //     } catch (\Throwable $e) {
-        //         Log::warning('Profile fetch failed: ' . $e->getMessage());
-        //     }
-        // }
         /*
         |--------------------------------------------------------------------------
         | SAVE DATABASE (Always Save)
