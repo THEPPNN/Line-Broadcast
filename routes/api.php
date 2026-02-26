@@ -7,7 +7,7 @@ use App\Jobs\ProcessLineUnsend;
 use App\Jobs\ProcessLineGroup;
 use App\Models\LineMessage;
 use App\Jobs\FetchLineDisplayName;
-use App\Jobs\DownloadLineMediaToTemp;
+use App\Jobs\DownloadLineMediaToS3;
 
 Route::post('/webhook/line', function (Request $request) {
     $body = $request->all();
@@ -40,11 +40,11 @@ Route::post('/webhook/line', function (Request $request) {
             if (in_array($msg['type'], ['image', 'video', 'audio', 'file'])) {
                 // UploadLineMediaToS3::dispatch($msg['id'], $msg['type'], $event['source'], $event['source']['groupId'] ?? null)
                 //     ->onQueue('line_media');
-                DownloadLineMediaToTemp::dispatch(
+                DownloadLineMediaToS3::dispatch(
                     $msg['id'],
                     $msg['type'],
                     $event['source']['groupId'] ?? null
-                )->onQueue('line_fast');
+                )->onQueue('line_media');
 
             } else {
                 FetchLineDisplayName::dispatch($msg['id'], $event['source'])
