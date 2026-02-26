@@ -45,7 +45,7 @@
                             <div class="mb-3">
                                 <label class="form-label">ตั้งเวลาส่ง</label>
                                 <div class="d-flex gap-2">
-                                    <input type="date" name="send_at" class="form-control"  value="{{ date('Y-m-d') }}" required>
+                                    <input type="date" name="send_at" class="form-control" value="{{ date('Y-m-d') }}" required>
                                     <input type="time" name="send_at_time" class="form-control" value="{{ date('H:i') }}" required>
                                 </div>
                             </div>
@@ -138,10 +138,17 @@
 
         $('#create-announcement').submit(function(e) {
             e.preventDefault();
-            $('.btn-create-announcement').prop('disabled', true);
-            $('.btn-create-announcement').html('กำลังสร้าง...');
             let formData = new FormData(this);
 
+            let sendAtTime = new Date(formData.get('send_at') + ' ' + formData.get('send_at_time'));
+            let now = new Date();
+            let diff = sendAtTime.getTime() - now.getTime();
+            if (sendAtTime < now) {
+                alert('ตั้งเวลาส่งต้องมีระยะเวลาอย่างน้อย 1 นาที');
+                return;
+            }
+            $('.btn-create-announcement').prop('disabled', true);
+            $('.btn-create-announcement').html('กำลังสร้าง...');
             $.ajax({
                 url: '/news/announcement',
                 type: 'POST',
@@ -179,9 +186,10 @@
                 sendAnnouncement(id);
             }
         });
+
         function cancelAnnouncement(id) {
             $.ajax({
-                url: '/news/announcement/cancel/'+id,
+                url: '/news/announcement/cancel/' + id,
                 type: 'POST',
                 data: {
                     _token: '{{ csrf_token() }}',
@@ -192,9 +200,10 @@
                 }
             });
         }
+
         function sendAnnouncement(id) {
             $.ajax({
-                url: '/news/announcement/send/'+id,
+                url: '/news/announcement/send/' + id,
                 type: 'POST',
                 data: {
                     _token: '{{ csrf_token() }}',
