@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Models\LineMessage;
 use App\Models\LineUnsend;
+use Illuminate\Support\Facades\Storage;
 
 class ProcessLineUnsend implements ShouldQueue
 {
@@ -57,9 +58,8 @@ class ProcessLineUnsend implements ShouldQueue
             ]);
 
             Log::info('UNSEND MESSAGE UPDATED : ' . json_encode($message));
-
         } catch (\Throwable $e) {
-            Log::error('Unsend DB Error: '.$e->getMessage());
+            Log::error('Unsend DB Error: ' . $e->getMessage());
             throw $e; // ให้ queue retry
         }
 
@@ -87,16 +87,48 @@ class ProcessLineUnsend implements ShouldQueue
             'text' => $messageText
         ]];
 
-        // ถ้าเป็นรูป → ส่งแนบไปด้วย
-        if ($message->type === "image" && $message->file_url) {
-            $url = config('filesystems.disks.s3.url') . '/' . $message->file_url;
+        if ($message->type === "image") {
 
-            $pushMessages[] = [
-                'type' => 'image',
-                'originalContentUrl' => $url,
-                'previewImageUrl' => $url
-            ];
+            $url = null;
+
+            // 1️⃣ ถ้าไฟล์อยู่ temp
+            if ($message->file_url && str_starts_with($message->file_url, 'temp/')) {
+                if (Storage::disk('local')->exists($message->file_url)) {
+                    $fileContent = Storage::disk('local')->get($message->file_url);
+                    $ext = pathinfo($message->file_url, PATHINFO_EXTENSION);
+                    $s3Path = "line_media/{$message->group_id}/{$message->message_id}.{$ext}";
+                    Storage::disk('s3')->put(
+                        $s3Path,
+                        $fileContent,
+                        ['visibility' => 'public']
+                    );
+                    Storage::disk('local')->delete($message->file_url);
+                    $message->update(['file_url' => $s3Path]);
+                    $url = config('filesystems.disks.s3.url') . '/' . $s3Path;
+                }
+            }
+            // 2️⃣ ถ้าอยู่ S3 แล้ว
+            else if ($message->file_url) {
+                $url = config('filesystems.disks.s3.url') . '/' . $message->file_url;
+            }
+
+            if ($url) {
+                $pushMessages[] = [
+                    'type' => 'image',
+                    'originalContentUrl' => $url,
+                    'previewImageUrl' => $url
+                ];
+            }
         }
+        // if ($message->type === "image" && $message->file_url) {
+        //     $url = config('filesystems.disks.s3.url') . '/' . $message->file_url;
+
+        //     $pushMessages[] = [
+        //         'type' => 'image',
+        //         'originalContentUrl' => $url,
+        //         'previewImageUrl' => $url
+        //     ];
+        // }
 
         try {
             $response = Http::withToken(config('services.line.token'))
@@ -112,9 +144,8 @@ class ProcessLineUnsend implements ShouldQueue
                     'body'   => $response->body()
                 ]);
             }
-
         } catch (\Throwable $e) {
-            Log::error('LINE Push Exception: '.$e->getMessage());
+            Log::error('LINE Push Exception: ' . $e->getMessage());
             throw $e; // retry ได้
         }
     }

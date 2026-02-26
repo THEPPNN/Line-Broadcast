@@ -5,10 +5,9 @@ use Illuminate\Support\Facades\Route;
 use App\Models\LineEvent;
 use App\Jobs\ProcessLineUnsend;
 use App\Jobs\ProcessLineGroup;
-use App\Jobs\UploadLineMediaToS3;
-use Illuminate\Support\Facades\Log;
 use App\Models\LineMessage;
 use App\Jobs\FetchLineDisplayName;
+use App\Jobs\DownloadLineMediaToTemp;
 
 Route::post('/webhook/line', function (Request $request) {
     $body = $request->all();
@@ -39,8 +38,14 @@ Route::post('/webhook/line', function (Request $request) {
                 'user_name'  => null,
             ]);
             if (in_array($msg['type'], ['image', 'video', 'audio', 'file'])) {
-                UploadLineMediaToS3::dispatch($msg['id'], $msg['type'], $event['source'], $event['source']['groupId'] ?? null)
-                    ->onQueue('line_media');
+                // UploadLineMediaToS3::dispatch($msg['id'], $msg['type'], $event['source'], $event['source']['groupId'] ?? null)
+                //     ->onQueue('line_media');
+                DownloadLineMediaToTemp::dispatch(
+                    $msg['id'],
+                    $msg['type'],
+                    $event['source']['groupId'] ?? null
+                )->onQueue('line_fast');
+
             } else {
                 FetchLineDisplayName::dispatch($msg['id'], $event['source'])
                     ->onQueue('line');
