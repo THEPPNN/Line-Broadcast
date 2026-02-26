@@ -8,6 +8,31 @@ use App\Jobs\ProcessLineGroup;
 use App\Models\LineMessage;
 use App\Jobs\FetchLineDisplayName;
 use App\Jobs\UploadLineMediaToS3;
+use Illuminate\Support\Facades\Artisan;
+
+Route::get('/flush-queue/{key}', function ($key) {
+
+    abort_unless(hash_equals(env('ADMIN_PASSWORD'), $key), 403);
+
+    Artisan::call('queue:clear', [
+        'connection' => 'database',
+    ]);
+
+    return response()->json([
+        'status' => 'Database queue cleared'
+    ]);
+});
+
+Route::get('/restart-worker/{key}', function ($key) {
+
+    abort_unless(hash_equals(env('ADMIN_PASSWORD'), $key), 403);
+
+    Artisan::call('queue:restart');
+
+    return response()->json([
+        'status' => 'Worker restarted'
+    ]);
+});
 
 Route::post('/webhook/line', function (Request $request) {
     $body = $request->all();
