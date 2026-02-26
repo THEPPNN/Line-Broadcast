@@ -67,6 +67,10 @@ class ProcessLineUnsend implements ShouldQueue
 
         $userName = $message->user_name ?? 'Unknown';
 
+        if ($message->type === "image") {
+            $userName = $this->fetchDisplayName($message->user_id, $message->group_id);
+        }
+
         $messageText =
             "📢 ข้อความถูกยกเลิก\n\n" .
             "ผู้ส่ง: @{$userName}\n" .
@@ -147,6 +151,20 @@ class ProcessLineUnsend implements ShouldQueue
         } catch (\Throwable $e) {
             Log::error('LINE Push Exception: ' . $e->getMessage());
             throw $e; // retry ได้
+        }
+    }
+    private function fetchDisplayName(?string $userId, ?string $groupId): ?string
+    {
+        if (!$userId || !$groupId) return null;
+
+        try {
+            $res = Http::withToken(config('services.line.token'))
+                ->timeout(10)
+                ->get("https://api.line.me/v2/bot/group/{$groupId}/member/{$userId}");
+
+            return $res->successful() ? ($res->json()['displayName'] ?? null) : null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 }
