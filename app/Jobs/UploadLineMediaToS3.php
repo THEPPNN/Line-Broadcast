@@ -20,7 +20,7 @@ class UploadLineMediaToS3 implements ShouldQueue
         public string $messageId,
         public string $type,
         public array  $source,
-        public string $group_id,
+        public ?string $group_id = null,
     ) {}
 
     public function handle(): void
@@ -34,7 +34,7 @@ class UploadLineMediaToS3 implements ShouldQueue
             'file_url'  => $r2Path,
         ], fn($v) => $v !== null));
     }
- 
+
     private function downloadAndUpload(): ?string
     {
         $ext = match ($this->type) {
@@ -44,10 +44,15 @@ class UploadLineMediaToS3 implements ShouldQueue
             default => 'bin',
         };
 
-        $r2Path = "line_media/{$this->group_id}/{$this->messageId}.{$ext}";
+        $groupId = $this->source['groupId']
+            ?? $this->source['roomId']
+            ?? $this->source['userId']
+            ?? 'unknown';
+        $r2Path = "line_media/{$groupId}/{$this->messageId}.{$ext}";
 
         $response = Http::withToken(config('services.line.token'))
             ->timeout(30)
+            ->withOptions(['stream' => true])
             ->get("https://api-data.line.me/v2/bot/message/{$this->messageId}/content");
 
         // content หายแล้ว (unsend/expired) ไม่ต้อง retry
@@ -62,13 +67,10 @@ class UploadLineMediaToS3 implements ShouldQueue
             throw new \RuntimeException("LINE API {$response->status()}");
         }
 
-        // ✅ stream ตรงไป R2 เลย ไม่แตะ disk
-        Storage::disk('s3')->put(
+        Storage::disk('s3')->writeStream(
             $r2Path,
-            $response->body(),
-            ['visibility' => 'public']
+            $response->toPsrResponse()->getBody()->detach()
         );
-
         return $r2Path;
     }
 
