@@ -140,13 +140,33 @@
             e.preventDefault();
             let formData = new FormData(this);
 
-            let sendAtTime = new Date(formData.get('send_at') + ' ' + formData.get('send_at_time'));
+            // ✅ เพิ่มฟังก์ชันแปลง 12-hour → 24-hour
+            function parseTimeTo24(timeStr) {
+                if (!timeStr) return '00:00';
+                timeStr = timeStr.trim();
+                if (timeStr.includes('AM') || timeStr.includes('PM')) {
+                    const [time, modifier] = timeStr.split(' ');
+                    let [hours, minutes] = time.split(':');
+                    if (modifier === 'PM' && hours !== '12') hours = parseInt(hours) + 12;
+                    if (modifier === 'AM' && hours === '12') hours = '00';
+                    return `${String(hours).padStart(2, '0')}:${minutes}`;
+                }
+                return timeStr;
+            }
+
+            // ✅ แปลงก่อนใช้
+            let timeValue = parseTimeTo24(formData.get('send_at_time'));
+            let sendAtTime = new Date(formData.get('send_at') + 'T' + timeValue);
             let now = new Date();
-            let diff = sendAtTime.getTime() - now.getTime();
+
+            // ✅ อัปเดต formData ให้ส่งค่า 24-hour ไป backend ด้วย
+            formData.set('send_at_time', timeValue);
+
             if (sendAtTime < now) {
                 alert('ตั้งเวลาส่งต้องมีระยะเวลาอย่างน้อย 1 นาที');
                 return;
             }
+
             $('.btn-create-announcement').prop('disabled', true);
             $('.btn-create-announcement').html('กำลังสร้าง...');
             $.ajax({
